@@ -9,5 +9,7 @@ test: test.c struct.h fonction.c
 #	gcc test.c -o test
 
 clean:
-	rm libfs.fs
-	rm mklibfs
+	rm -f libfs.fs
+	rm -f mklibfs
+	rm -f test
+	rm -f core*

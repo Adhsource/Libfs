@@ -50,6 +50,7 @@ struct inode {
     unsigned int i_mode;             /* Mode et droits du fichier */
     unsigned int i_size;             /* Nombre d’octets du fichier */
     unsigned int i_addr[NADDR];      /* Blocs composant le fichier */
+    unsigned int i_numb;             /* Numero de l'inode disque (Ajout !) */
 };
 
 struct file {
@@ -81,7 +82,7 @@ int lfs_close(int fd);
 
 /* --- Fonctions internes à implémenter --- */
 
-struct inode *namei(char *name, int flag);
+struct inode *namei(const char *name, int flag);
 struct inode *iget(int ino);
 void         iput(struct inode *ip);
 int          bmap(struct inode *ip, int bn, int flag);
