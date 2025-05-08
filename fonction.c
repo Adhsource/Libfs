@@ -28,30 +28,63 @@ void goto_inodes(){
 
 }
 
-void goto_blocks(){
-    /* Deplace la tete de lecture au debut des blocks de donnees */
-    goto_inodes();
-
-    int size_inodes = super.s_isize*32;
-    fseek(f_file,size_inodes,SEEK_CUR);
-    fseek(f_file,(BSIZE-(size_inodes % BSIZE)),SEEK_CUR);
+void goto_bitmap_block(int blkno){
+    fseek(f_file,(2*BSIZE),SEEK_SET); // seek to start of bitmap
+    fseek(f_file,(blkno/8),SEEK_CUR); // goto the correct byte
 }
 
 /* Fonctions externes pour lecture/écriture de blocs */
-void bread(int blkno, char *buf){
-    goto_blocks();
-    fseek(f_file,blkno,SEEK_CUR); // etre sur du blkno (si 0 ou reel)
+void bread(int blkno, void *buf){
+    fseek(f_file,blkno*BSIZE,SEEK_SET);
     fread(buf,BSIZE,1 ,f_file);
-
-
 }
-void bwrite(int blkno, char *buf){
-    goto_blocks();
-    //fseek
+
+void bwrite(int blkno, void *buf){
+    fseek(f_file,blkno*BSIZE,SEEK_SET);
     fwrite(buf,BSIZE,1 ,f_file);
-
 }
 
+/* Fonction retournant le 1er bloc libre */
+int balloc(){
+    char temp;
+    goto_bitmap_block(0);
+
+    // parcours de la bitmap
+    for(int i = 0; i < ((super.s_fsize+7)/8); i++){
+        fread(&temp,1,1,f_file);
+        fseek(f_file,-1,SEEK_CUR);
+        char val;
+        for(int j = 0; i < 8; i++){
+            val = (1<<j);
+            if(!(temp&val)){
+                temp |= val;
+                fwrite(&temp,1,1,f_file);
+                return ((i*8)+j);
+
+            }
+        }
+
+    }
+    fprintf(stderr,"No Free blocks");
+    return -1;
+}
+
+/* Marque un bloc comme étant libre */
+void bfree(int blkno){
+    char bits;
+    char mask = 1 << (blkno%8);
+
+    goto_bitmap_block(blkno);
+
+
+    fread(&bits,1,1,f_file);
+    goto_bitmap_block(blkno);
+
+    bits = bits & ~mask;
+
+    fwrite(&bits,1,1,f_file);
+
+}
 
 /* Crée un répertoire à l'emplacement pathname */
 int lfs_mkdir(const char *pathname, int mode) {
@@ -188,7 +221,6 @@ return 0;
 }
 
 /* Ouverture d'un fichier */
-
 int lfs_open(const char *pathname,int flags ){
     struct inode * node = namei(pathname,0);
     // gestion des flags
@@ -216,7 +248,6 @@ int lfs_open(const char *pathname,int flags ){
 
 
 /*  Initialisation en memoire du libfs */
-
 void init_libfs(){
     f_file = fopen("libfs.fs","rb+");
     if(!f_file){
@@ -238,17 +269,21 @@ void init_libfs(){
 
     /* Set current dir */
     current.u_cdir=0;
-    //iget(0);
+    iget(0);
 
 
 }
 
-
+/*  fermeture et synchro du fichier libfs */
 void close_libfs(){
+
+    fseek(f_file,BSIZE,SEEK_SET);
+    fwrite(&super,BSIZE,1 ,f_file);
 
     fclose(f_file);
 }
 
+/* Focntion de recherche d'inode par nom */
 struct inode *namei(const char * name, int flag){
     struct inode * i_out = NULL;
 
@@ -285,6 +320,7 @@ struct inode *namei(const char * name, int flag){
     return i_out;
 }
 
+/* Recuperation de l'inode */
 struct inode * iget(int ino){
 
     if(ino > (super.s_isize - 1)){
@@ -326,6 +362,7 @@ struct inode * iget(int ino){
     return &inode[free_slot];
 }
 
+/* Suppression de l'inode en memoire et synchro */
 void iput(struct inode *ip){
 
     goto_inodes();
@@ -346,10 +383,49 @@ void iput(struct inode *ip){
     ip->i_mode = 0;
 }
 
+
+/* Fonction a analyser 100% */
 int bmap(struct inode *ip, int bn, int flag){
-    return 0;
+
+
+
+    /* If no indirections */
+    if(bn < NADDR-1){
+        int realbn = ip->i_addr[bn];
+        if(!realbn){
+            int newblk = balloc();
+            if(newblk > 0){
+                ip->i_addr[bn] = newblk;
+                return newblk;
+            }
+            return realbn;
+        }
+
+    /* If indirect block not set*/
+    } else {
+        int realbn = ip->i_addr[NADDR-1];
+
+        if(!realbn){
+            int newblk = balloc();
+            if(newblk > 0){
+                ip->i_addr[NADDR-1] = newblk;
+            }
+        }
+
+        /* Reading indirect block */
+        int * ind_blk = malloc(BSIZE);
+        bread(ip->i_addr[NADDR-1],ind_blk);
+
+        int indir_bn = bn - NADDR + 1;
+        realbn = ind_blk[indir_bn];
+        if(!realbn){
+            realbn = balloc();
+            if(realbn > 0){
+                ind_blk[indir_bn] = realbn;
+            }
+        }
+        free(ind_blk);
+        return realbn;
+        }
+    return -1;
 }
-
-// bread et bwrite ???
-
-

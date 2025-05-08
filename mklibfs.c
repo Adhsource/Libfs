@@ -82,6 +82,8 @@ int main(int argc, char ** argv){
 
     /* Setting Bitmap blocks */
 
+    // set some to 1
+
     /* one bit per block so divided by 8
         plus 7 for rounding up */
 

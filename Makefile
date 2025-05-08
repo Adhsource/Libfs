@@ -5,8 +5,6 @@ mklibfs: mklibfs.c
 test: test.c struct.h fonction.c
 	gcc test.c fonction.c -o test
 
-#test: test.c struct.h
-#	gcc test.c -o test
 
 clean:
 	rm -f libfs.fs
