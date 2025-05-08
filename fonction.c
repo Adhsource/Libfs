@@ -13,6 +13,7 @@ FILE * f_file;
 /* Variables globales du fs */
 struct user current;
 struct inode inode[NINODE];
+
 struct filsys super; // Superblock
 
 /* Fonctions auxiliaires appele par d'autres fonctions */
@@ -209,7 +210,7 @@ int lfs_chdir(const char * path){
     }else if(node->i_mode & IFNORM){
         return -1;
     }else{
-        current.u_cdir = node->i_numb; // voir selon implem
+        current.u_cdir = node->i_numb;
         return 0;
     }
 }
@@ -225,7 +226,7 @@ int lfs_open(const char *pathname,int flags ){
     struct inode * node = namei(pathname,0);
     // gestion des flags
     if(!node){
-        lfs_creat(pathname,flags);
+        return lfs_creat(pathname,flags);
     }else{
         if(node->i_mode&flags){
             for(int i = 0; i < NFILE; i++){
@@ -233,16 +234,19 @@ int lfs_open(const char *pathname,int flags ){
                     current.u_ofile[i] = malloc(sizeof(struct file));
                     current.u_ofile[i]->f_flag = flags;
                     current.u_ofile[i]->f_inode = node;
-                    break;
+                    return i;
+
                 }
+
             }
+            fprintf(stderr,"\nNo free file slot\n");
+            return -1;
+
         } else {
             fprintf(stderr,"\nInvalid opening mode\n");
             return -1;
         }
-        return 0;
     }
-    return 99;
 }
 
 
@@ -277,7 +281,10 @@ void init_libfs(){
 /*  fermeture et synchro du fichier libfs */
 void close_libfs(){
 
-    // fermeture des inodes et des fichiers
+    for(int i = 0; i < NINODE; i++){
+        if (inode[i].i_mode)
+            iput(&inode[i]);
+    }
     fseek(f_file,BSIZE,SEEK_SET);
     fwrite(&super,BSIZE,1 ,f_file);
 
@@ -287,6 +294,7 @@ void close_libfs(){
 /* Focntion de recherche d'inode par nom */
 struct inode *namei(const char * name, int flag){
     struct inode * i_out = NULL;
+    struct inode * i_out_n = NULL;
 
     /* copy of the name (because strtok) */
     char * new_name = strdup(name);
@@ -299,25 +307,72 @@ struct inode *namei(const char * name, int flag){
 
     char * path = strtok(new_name,"/");
     while(path){
-        //if((i_out->i_mode)&IFDIR){
-        if(1){
-            for(;1;){//check i_addr
-                struct direct * dir;
-                if(dir->d_name == path){
-                    i_out = iget(dir->d_ino);
+        if((i_out->i_mode)&IFDIR){
+            struct direct * dir_names = malloc(BSIZE);
+
+            for(int i = 0; i <NADDR-2; i++){
+                i_out_n = NULL;
+                if(i_out->i_addr[i]){
+                    bread(i_out->i_addr[i],dir_names);
+                } else {
+                    i_out = NULL;
+                    break;
+                }
+
+                for(int j = 0; j < BSIZE/sizeof(struct direct) ; j++){
+                    if(!strcmp(path,dir_names[j].d_name)){
+                        i_out_n = iget(dir_names[j].d_ino);
+                        break;
+                    }
+                }
+
+                if (i_out_n != i_out){
+                    i_out = i_out_n;
                     break;
                 }
             }
+
+            if(!i_out_n){
+                int * indir_dir = malloc(BSIZE);
+
+                if(i_out->i_addr[NADDR-1]){
+                    bread(i_out->i_addr[NADDR-1],dir_names);
+                } else {
+                    i_out = NULL;
+                    break;
+                }
+
+                for(int k = 0; k < BSIZE/sizeof(int); k++){
+                    if(indir_dir[k]){
+                        bread(indir_dir[k],dir_names);
+                    } else {
+                        i_out = NULL;
+                        break;
+                    }
+
+                    for(int j = 0; j < BSIZE/sizeof(struct direct) ; j++){
+                        if(!strcmp(path,dir_names[j].d_name)){
+                            i_out_n = iget(dir_names[j].d_ino);
+                            break;
+                        }
+                    }
+
+                    if (i_out_n != i_out){
+                        i_out = i_out_n;
+                        break;
+                    }
+                }
+                free(indir_dir);
+            }
+
+        free(dir_names);
 
         }else{ // if name not found
             i_out = NULL;
             break;
         }
 
-    }
-
-
-
+}
     return i_out;
 }
 
@@ -387,7 +442,6 @@ void iput(struct inode *ip){
 
 /* Fonction a analyser 100% */
 int bmap(struct inode *ip, int bn, int flag){
-
 
 
     /* If no indirections */
