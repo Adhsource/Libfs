@@ -80,6 +80,8 @@ int main(int argc, char ** argv){
 
     fwrite(&super,BSIZE,1,f_file);
 
+    fprintf(stderr,"DEBUG: After super block %ld \n",ftell(f_file));
+
     /* Setting Bitmap blocks */
 
     // set some to 1
@@ -95,27 +97,55 @@ int main(int argc, char ** argv){
 
     fseek(f_file,(BSIZE-(nb_bmap_bits % BSIZE)),SEEK_CUR);
 
+    fprintf(stderr,"DEBUG: After Bitmap blocks %ld \n",ftell(f_file));
 
     /* Setting inodes */
-
-    // writing root inode
-
-    struct dinode root_inode = {2,0,0}; // voir position of direct struct !! A faire!!
-    fwrite(&root_inode,32,1,f_file);
+    long first_ino = ftell(f_file);
 
     // Default inode
 
     struct dinode def_inode = {0,0};
 
-    for(int i = 1; i < nb_inodes; i++)
+    for(int i = 0; i < nb_inodes; i++)
         fwrite(&def_inode,32,1,f_file);
 
 
     /* Writing an entire block */
     fseek(f_file,(BSIZE-((nb_inodes * 32) % BSIZE)),SEEK_CUR);
 
+    long first_blk = ftell(f_file);
+    fprintf(stderr,"DEBUG: After inodes %ld \n",first_blk);
+
+    struct dinode root_inode = {2,0,first_blk/BSIZE};
+
+    struct direct cur = {0,"."};
+    struct direct pre = {0,".."};
+
+    int direct_size = sizeof(struct direct);
+
+    fwrite(&cur,direct_size,1,f_file);
+    fwrite(&pre,direct_size,1,f_file);
+
+    fseek(f_file,(BSIZE-((direct_size*2) % BSIZE)),SEEK_CUR);
+    fprintf(stderr,"DEBUG: After all %ld \n",ftell(f_file));
+
+    char used_blk = (1 << (ftell(f_file) /BSIZE)) -1 ; // Car tout ce qui a avant etait deja alloué
+
+
+    // set bitmap
+    fseek(f_file,(2*BSIZE),SEEK_SET); // seek to start of bitmap
+    fwrite(&used_blk,1,1,f_file);
+
+    fseek(f_file,(2*BSIZE),SEEK_SET);
+
+    // set root inode
+
+    fseek(f_file,first_ino,SEEK_SET); // seek to start of bitmap
+    fwrite(&root_inode,32,1,f_file);
+
     fclose(f_file);
     return 0;
+
 
 }
 

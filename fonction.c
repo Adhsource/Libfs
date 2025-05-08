@@ -98,8 +98,8 @@ int lfs_mkdir(const char *pathname, int mode) {
     /* Allouer et initialiser le premier bloc */
     int blk = bmap(ip, 0, BWRITE);
     struct direct entries[BSIZE / sizeof(struct direct)];
-    int ino_new = ip - inode;           /* numéro d'inode du nouveau répertoire */
-    int ino_parent = current.u_cdir;    /* inode du répertoire courant */
+    int ino_new = ip - inode;    /* numéro d'inode du nouveau répertoire */
+    int ino_parent = current.u_cdir;  /* inode du répertoire courant */
 
     /* Entrée "." */
     entries[0].d_ino = ino_new;
@@ -277,6 +277,7 @@ void init_libfs(){
 /*  fermeture et synchro du fichier libfs */
 void close_libfs(){
 
+    // fermeture des inodes et des fichiers
     fseek(f_file,BSIZE,SEEK_SET);
     fwrite(&super,BSIZE,1 ,f_file);
 
