@@ -88,6 +88,9 @@ int balloc(){
 
 /* Marque un bloc comme étant libre */
 void bfree(int blkno){
+    if(!blkno){ // si block 0
+        return;
+    }
     char bits;
     char mask = 1 << (blkno%8);
 
@@ -213,12 +216,14 @@ int lfs_close(int fd) {
     struct file *fp = current.u_ofile[fd];
     if (!fp) return -1;
 
+    free(current.u_ofile[fd]);
     current.u_ofile[fd] = NULL;
     iput(fp->f_inode);
     return 0;
 }
 
 /* Changement de dossier */
+// inode en memoire ??
 int lfs_chdir(const char * path){
     struct inode * node = namei(path,0);
     if(node){
@@ -251,104 +256,7 @@ int get_file(struct inode * node, int flags){
 }
 
 /* Creation d'un fichier */  // check current
-int lfs_creat(const char *pathname, int mode){
 
-    struct inode * node = namei(pathname,0);
-
-    struct inode * new = NULL;
-    const char* name = strrchr(pathname, '/')+1; // Verifie que les slash
-    // si le nom a pas de / alors strrchr retourne Ox1
-
-    if(name == (char*)0x1){
-        //printf("Failure of strrchr");
-        name = pathname;
-    }
-    printf("name: %s",name);
-
-    int new_i_no = 0;
-    if(node->i_mode&IFDIR){
-        //Recuperation d'une inode libre
-            if(super.s_ninode){
-                for(int i = 0; i < NIFREE ; i++){
-                    if(super.s_inode[i] != 0){
-                        new_i_no = super.s_inode[i];
-                        new = iget(new_i_no);
-                        new->i_mode = mode;
-
-                        super.s_ninode--;
-                        super.s_inode[i] = 0;
-                        break;
-
-                    }
-                }
-            }else{
-                fprintf(stderr,"\nNo free Inodes\n");
-                return -1;
-            }
-        /* Recherche  */
-        struct direct * folder = malloc(BSIZE);
-        memset(folder,0,BSIZE);
-
-        int i = 0;
-        for(; i <NADDR-2; i++){
-                if(node->i_addr[i])
-                    bread(node->i_addr[i],folder);
-                else
-                    node->i_addr[i] = balloc(); // voir folder et bwrite
-        }
-
-        /* Recherche d'une entree directory libre */
-        for(int j = 0; j < BSIZE/sizeof(struct direct) ; j++){
-            if(folder[j].d_name[0] == '\0'){ // On essaye avec le nom vu que l'inode 0 est valide :c
-                strncpy(folder[j].d_name,name,12);
-                folder[j].d_ino = new_i_no;
-
-                /* Sync sur disque */
-                bwrite(node->i_addr[i],folder);
-
-                return get_file(new,mode);
-            }
-        }
-        int * indir_dir = malloc(BSIZE);
-        memset(indir_dir,0,BSIZE);
-
-        /* Recherche dans les blocs indirect */
-        if(node->i_addr[NADDR-1]){
-            bread(node->i_addr[NADDR-1],indir_dir);
-        } else {
-            indir_dir[0] = balloc(); // voir folder et bwrite
-        }
-
-        /* lecture des directory des blocs indirects */
-        for(int k = 0; k < BSIZE/sizeof(int); k++){
-            if(indir_dir[k])
-                bread(indir_dir[k],folder);
-            else
-                indir_dir[k] = balloc();
-
-                /* Recherche d'une entree directory libre */
-            for(int j = 0; j < BSIZE/sizeof(struct direct) ; j++){
-                if(folder[j].d_name[0] == '\0'){ // On essaye avec le nom vu que l'inode 0 est valide :c
-                    strncpy(folder[j].d_name,name,12);
-                    folder[j].d_ino = new_i_no;
-
-                    /* Sync sur disque */
-                    bwrite(node->i_addr[NADDR-1],folder);
-                    bwrite(indir_dir[k],folder);
-                    free(indir_dir);
-
-                    return get_file(new,mode);
-                }
-            }
-        }
-
-
-    }else{
-        return -1;
-    }
-return 0;
-
-}
 
 /* Ouverture d'un fichier */
 int lfs_open(const char *pathname,int flags ){
@@ -361,6 +269,20 @@ int lfs_open(const char *pathname,int flags ){
     }
 }
 
+int lfs_creat(const char *pathname, int mode) {
+    struct inode *ip = namei((char *)pathname, 1);
+    if (!ip) return -1;
+
+    /* Définir le mode et la taille du répertoire (un bloc) */
+    ip->i_mode = IFNORM | mode;
+    ip->i_size = BSIZE;
+
+    /* Allouer le premier bloc */
+    int blk = bmap(ip, 0, BWRITE);
+
+    iput(ip);
+    return 0;
+}
 
 
 /*  Initialisation en memoire du libfs */
@@ -403,7 +325,13 @@ void close_libfs(){
     fclose(f_file);
 }
 
-/* Focntion de recherche d'inode par nom */
+/* Fonction de recherche d'inode par nom */
+// Verifier le else
+// free des inodes ??
+// flag 0 existe deja ,1 cree ,2 delete
+// ouais delet !
+
+// mon prie enamei
 struct inode *namei(const char * name, int flag){
     struct inode * i_out = NULL;
     struct inode * i_out_n = NULL;
@@ -491,10 +419,30 @@ struct inode *namei(const char * name, int flag){
 
         }else{ // if name not found
             fprintf(stderr,"\nName not found\n");
+            flag =1; // pour eviter les supperssion du mauvais fichier
             break;
         }
 
-}
+    }
+    /* si suppression demandé*/
+    if(flag == 2){
+        i_out->i_numb = 0;
+        for(int u = 0; u < NADDR-2;u++){
+            bfree(i_out->i_addr[u]);
+        }
+        /* parcours indirect block*/
+        if(i_out->i_addr[NADDR-1]){
+
+            int * indir = malloc(BSIZE);
+            memset(indir,0,BSIZE);
+            bread(i_out->i_addr[NADDR-1],indir);
+
+            for(int v = 0; v < BSIZE/sizeof(int); v++)
+                bfree(indir[v]);
+
+        }
+        i_out->i_mode = 0;
+    }
     return i_out;
 }
 
@@ -579,7 +527,7 @@ void iput(struct inode *ip){
 }
 
 
-/* Fonction a analyser 100% */
+/* Fonction a analyser 100% voir flags*/
 int bmap(struct inode *ip, int bn, int flag){
 
 
