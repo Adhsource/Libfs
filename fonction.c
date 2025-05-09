@@ -214,10 +214,112 @@ int lfs_chdir(const char * path){
         return 0;
     }
 }
+/* Parcours la table des fichiers pour un emplacement */
+int get_file(struct inode * node, int flags){
+    if(node->i_mode&flags){
+        for(int i = 0; i < NFILE; i++){
+            if(current.u_ofile[i] == NULL){
+                current.u_ofile[i] = malloc(sizeof(struct file));
+                current.u_ofile[i]->f_flag = flags;
+                current.u_ofile[i]->f_inode = node;
+                return i;
+            }
+        }
+        fprintf(stderr,"\nNo free file slot\n");
+        return -1;
 
-/* Creation d'un fichier */
+    } else {
+        fprintf(stderr,"\nInvalid opening mode\n");
+        return -1;
+    }
+}
+
+/* Creation d'un fichier */  // check current
 int lfs_creat(const char *pathname, int mode){
-    // namei sauf du last
+
+    struct inode * node = namei(pathname,0);
+
+    struct inode * new = NULL;
+    char* name = strrchr(pathname, '/')+1;
+
+    int new_i_no = 0;
+    if(node->i_mode&IFDIR){
+        //Recuperation d'une inode libre
+            if(super.s_ninode){
+                for(int i = 0; i < NIFREE ; i++){
+                    if(super.s_inode[i] != 0){
+                        new = iget(super.s_inode[i]);
+                        super.s_ninode--;
+                        new_i_no = super.s_inode[i];
+                        super.s_inode[i] = 0;
+
+                    }
+                }
+            } // else seek all inodes
+        /* Recherche  */
+        struct direct * folder = malloc(BSIZE);
+        memset(folder,0,BSIZE);
+
+
+
+
+        int i = 0;
+        for(; i <NADDR-2; i++){
+                if(node->i_addr[i])
+                    bread(node->i_addr[i],folder);
+                else
+                    node->i_addr[i] = balloc(); // voir folder et bwrite
+        }
+
+        /* Recherche d'une entree directory libre */
+        for(int j = 0; j < BSIZE/sizeof(struct direct) ; j++){
+            if(folder[j].d_name[0] == '\0'){ // On essaye avec le nom vu que l'inode 0 est valide :c
+                strncpy(folder[j].d_name,name,12);
+                folder[j].d_ino = new_i_no;
+
+                /* Sync sur disque */
+                bwrite(node->i_addr[i],folder);
+
+                return get_file(node,mode);
+            }
+        }
+        int * indir_dir = malloc(BSIZE);
+        memset(indir_dir,0,BSIZE);
+
+        /* Recherche dans les blocs indirect */
+        if(node->i_addr[NADDR-1]){
+            bread(node->i_addr[NADDR-1],indir_dir);
+        } else {
+            indir_dir[0] = balloc(); // voir folder et bwrite
+        }
+
+        /* lecture des directory des blocs indirects */
+        for(int k = 0; k < BSIZE/sizeof(int); k++){
+            if(indir_dir[k])
+                bread(indir_dir[k],folder);
+            else
+                indir_dir[k] = balloc();
+
+                /* Recherche d'une entree directory libre */
+            for(int j = 0; j < BSIZE/sizeof(struct direct) ; j++){
+                if(folder[j].d_name[0] == '\0'){ // On essaye avec le nom vu que l'inode 0 est valide :c
+                    strncpy(folder[j].d_name,name,12);
+                    folder[j].d_ino = new_i_no;
+
+                    /* Sync sur disque */
+                    bwrite(node->i_addr[NADDR-1],folder);
+                    bwrite(indir_dir[k],folder);
+                    free(indir_dir);
+
+                    return get_file(node,mode);
+                }
+            }
+        }
+
+
+    }else{
+        return -1;
+    }
 return 0;
 }
 
@@ -228,24 +330,7 @@ int lfs_open(const char *pathname,int flags ){
     if(!node){
         return lfs_creat(pathname,flags);
     }else{
-        if(node->i_mode&flags){
-            for(int i = 0; i < NFILE; i++){
-                if(current.u_ofile[i] == NULL){
-                    current.u_ofile[i] = malloc(sizeof(struct file));
-                    current.u_ofile[i]->f_flag = flags;
-                    current.u_ofile[i]->f_inode = node;
-                    return i;
-
-                }
-
-            }
-            fprintf(stderr,"\nNo free file slot\n");
-            return -1;
-
-        } else {
-            fprintf(stderr,"\nInvalid opening mode\n");
-            return -1;
-        }
+        return get_file(node,flags);
     }
 }
 
@@ -309,46 +394,48 @@ struct inode *namei(const char * name, int flag){
     while(path){
         if((i_out->i_mode)&IFDIR){
             struct direct * dir_names = malloc(BSIZE);
-
+            /* Parcours des blocks directs */
             for(int i = 0; i <NADDR-2; i++){
                 i_out_n = NULL;
-                if(i_out->i_addr[i]){
-                    bread(i_out->i_addr[i],dir_names);
-                } else {
-                    i_out = NULL;
-                    break;
-                }
 
+                /* Si adresse lecture, sinon passage suivant */
+                if(i_out->i_addr[i])
+                    bread(i_out->i_addr[i],dir_names);
+                else
+                    continue;
+
+
+                /* Pour un bloc entier de struct direct , recherche du nom */
                 for(int j = 0; j < BSIZE/sizeof(struct direct) ; j++){
                     if(!strcmp(path,dir_names[j].d_name)){
                         i_out_n = iget(dir_names[j].d_ino);
                         break;
                     }
                 }
-
+                /* Si un nouveau nom a bien ete trouve */
                 if (i_out_n != i_out){
                     i_out = i_out_n;
                     break;
                 }
             }
-
+            /* Parcours des blocs indirects */
             if(!i_out_n){
                 int * indir_dir = malloc(BSIZE);
+
+                /* Verification de la presence du bloc indirect */
 
                 if(i_out->i_addr[NADDR-1]){
                     bread(i_out->i_addr[NADDR-1],dir_names);
                 } else {
-                    i_out = NULL;
                     break;
                 }
 
+                /* lecture des adresses des blocs indirects */
                 for(int k = 0; k < BSIZE/sizeof(int); k++){
-                    if(indir_dir[k]){
+                    if(indir_dir[k])
                         bread(indir_dir[k],dir_names);
-                    } else {
-                        i_out = NULL;
-                        break;
-                    }
+                    else
+                        continue;
 
                     for(int j = 0; j < BSIZE/sizeof(struct direct) ; j++){
                         if(!strcmp(path,dir_names[j].d_name)){
