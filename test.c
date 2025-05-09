@@ -23,13 +23,14 @@ int main(){
     ret = lfs_creat("bob",IFNORM|IREAD|IWRITE);  //debug
     printf("\n--- creat() : %d\n\n\n",ret);
 
+
     //struct inode * in = namei(".",0);
     //printf("namei : %d\n",in->i_numb);
 
     //lfs_chdir("/bin");
     printf("--- current dir : %d\n\n\n",current.u_cdir);
 
-    close_libfs();
+    close_libfs(); // casse tout
 
     return 0;
 }

@@ -34,28 +34,43 @@ void goto_bitmap_block(int blkno){
     fseek(f_file,(blkno/8),SEEK_CUR); // goto the correct byte
 }
 
+void goto_blocks(){
+    /* Deplace la tete de lecture au debut des blocks de donnees */
+    goto_inodes();
+
+    int size_inodes = super.s_isize*32;
+    fseek(f_file,size_inodes,SEEK_CUR);
+    fseek(f_file,(BSIZE-(size_inodes % BSIZE)),SEEK_CUR);
+}
+
 /* Fonctions externes pour lecture/écriture de blocs */
 void bread(int blkno, void *buf){
-    fseek(f_file,blkno*BSIZE,SEEK_SET);
+    goto_blocks();
+    fseek(f_file,blkno*BSIZE,SEEK_CUR);
     fread(buf,BSIZE,1 ,f_file);
 }
 
 void bwrite(int blkno, void *buf){
-    fseek(f_file,blkno*BSIZE,SEEK_SET);
+    goto_blocks();
+
+    fseek(f_file,blkno*BSIZE,SEEK_CUR);
     fwrite(buf,BSIZE,1 ,f_file);
+    //fprintf(stderr,"\n\n LD = %ld\n",ftell(f_file));
+    //abort();
 }
 
 /* Fonction retournant le 1er bloc libre */
 int balloc(){
     char temp;
+    char val;
     goto_bitmap_block(0);
 
     // parcours de la bitmap
     for(int i = 0; i < ((super.s_fsize+7)/8); i++){
         fread(&temp,1,1,f_file);
         fseek(f_file,-1,SEEK_CUR);
-        char val;
-        for(int j = 0; i < 8; i++){
+
+        for(int j = 0; j < 8; j++){
             val = (1<<j);
             if(!(temp&val)){
                 temp |= val;
@@ -67,6 +82,7 @@ int balloc(){
 
     }
     fprintf(stderr,"No Free blocks");
+    abort();
     return -1;
 }
 
@@ -230,7 +246,6 @@ int get_file(struct inode * node, int flags){
 
     } else {
         fprintf(stderr,"\nInvalid opening mode\n");
-        abort();
         return -1;
     }
 }
@@ -262,6 +277,7 @@ int lfs_creat(const char *pathname, int mode){
 
                         super.s_ninode--;
                         super.s_inode[i] = 0;
+                        break;
 
                     }
                 }
@@ -328,6 +344,7 @@ int lfs_creat(const char *pathname, int mode){
         return -1;
     }
 return 0;
+
 }
 
 /* Ouverture d'un fichier */

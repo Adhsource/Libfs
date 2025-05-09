@@ -15,6 +15,10 @@ core:
 	rm -f core*
 clear:
 	clear
+
+file:	mklibfs
+	./mklibfs -s 200 -i 14
+
 quick: clear core test
 	./test
 
