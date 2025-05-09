@@ -116,7 +116,7 @@ int main(int argc, char ** argv){
     long first_blk = ftell(f_file);
     fprintf(stderr,"DEBUG: After inodes %ld \n",first_blk);
 
-    struct dinode root_inode = {2,0,first_blk/BSIZE};
+    struct dinode root_inode = {IFDIR,BSIZE,first_blk/BSIZE};
 
     struct direct cur = {0,"."};
     struct direct pre = {0,".."};

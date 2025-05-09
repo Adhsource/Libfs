@@ -240,7 +240,14 @@ int lfs_creat(const char *pathname, int mode){
     struct inode * node = namei(pathname,0);
 
     struct inode * new = NULL;
-    char* name = strrchr(pathname, '/')+1;
+    const char* name = strrchr(pathname, '/')+1; // Verifie que les slash
+    // si le nom a pas de / alors strrchr retourne Ox1
+
+    if(name == (char*)0x1){
+        printf("Failure of strrchr");
+        name = pathname;
+    }
+    printf("name: %s",name);
 
     int new_i_no = 0;
     if(node->i_mode&IFDIR){
@@ -381,17 +388,24 @@ struct inode *namei(const char * name, int flag){
     struct inode * i_out = NULL;
     struct inode * i_out_n = NULL;
 
+
     /* copy of the name (because strtok) */
     char * new_name = strdup(name);
 
     /* Seraching from root ? */
-    if(name[0]=='/')
+    if(name[0]=='/'){
         i_out = &inode[0]; // rootdir
-    else
+        printf("\n- namei Debug root");
+    }else{
         i_out = iget(current.u_cdir); //current dir
+        printf("\n- namei Debug curr");
+    }
 
     char * path = strtok(new_name,"/");
     while(path){
+        printf("\n%s",path);
+        printf("\n- namei debug: path: %s\n",path);
+        printf("\n- namei debug: mode: %d\n",i_out->i_mode);
         if((i_out->i_mode)&IFDIR){
             struct direct * dir_names = malloc(BSIZE);
             /* Parcours des blocks directs */
@@ -413,16 +427,18 @@ struct inode *namei(const char * name, int flag){
                     }
                 }
                 /* Si un nouveau nom a bien ete trouve */
-                if (i_out_n != i_out){
+                if (i_out_n != i_out && i_out_n){ // ici
                     i_out = i_out_n;
                     break;
                 }
             }
-            /* Parcours des blocs indirects */
+            /* Parcours des blocs indirects */  // cassé
+
+
             if(!i_out_n){
                 int * indir_dir = malloc(BSIZE);
 
-                /* Verification de la presence du bloc indirect */
+                //Verification de la presence du bloc indirect
 
                 if(i_out->i_addr[NADDR-1]){
                     bread(i_out->i_addr[NADDR-1],dir_names);
@@ -430,7 +446,7 @@ struct inode *namei(const char * name, int flag){
                     break;
                 }
 
-                /* lecture des adresses des blocs indirects */
+                // lecture des adresses des blocs indirects
                 for(int k = 0; k < BSIZE/sizeof(int); k++){
                     if(indir_dir[k])
                         bread(indir_dir[k],dir_names);
@@ -455,7 +471,7 @@ struct inode *namei(const char * name, int flag){
         free(dir_names);
 
         }else{ // if name not found
-            i_out = NULL;
+            fprintf(stderr,"\nName not found\n");
             break;
         }
 
@@ -472,19 +488,35 @@ struct inode * iget(int ino){
     }
 
     // emplacement de l'entree dans la table des inodes
-    int free_slot = 0;
+    int free_slot = -1;
+    struct dinode tmp;
+
 
     /* parcours des inodes déja en mémoire */
     for(int i = 0 ;i<NINODE ;i++){
-        if(inode[i].i_numb==ino)
+        if(inode[i].i_numb==ino && ino)
             return &inode[i];
-        if(!free_slot && inode[i].i_mode == 0)
+        if(inode[i].i_mode != 0 && !ino) //gestion root
+            return &inode[i];
+
+        if(free_slot == -1 && inode[i].i_mode == 0)
             free_slot=i;
     }
 
-    if(!free_slot){
+    if(free_slot == -1){
         fprintf(stderr,"\nNo free inode slot\n");
         return NULL;
+    } else {
+        goto_inodes();
+        fseek(f_file,(sizeof(struct dinode)*ino),SEEK_CUR);
+        fread(&tmp,sizeof(struct dinode),1,f_file);
+
+
+        inode[free_slot].i_mode = tmp.di_mode;
+        inode[free_slot].i_size = tmp.di_size;
+        inode[free_slot].i_numb = ino;
+        memcpy(&inode[free_slot],tmp.di_addr,sizeof(int)*6 );
+
     }
 
 
@@ -494,6 +526,7 @@ struct inode * iget(int ino){
 
     struct dinode temp;
     fread(&temp,sizeof(temp),1 ,f_file);
+    // printf("\niget debug: inode: %d mode: %d , size: %d, zone = %d \n",ino,temp.di_mode,temp.di_size,free_slot);
 
     // modification of the free_slot in memory
     memcpy(&inode[free_slot].i_addr,&temp.di_addr,sizeof(unsigned int) * 6 );
