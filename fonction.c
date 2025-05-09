@@ -281,7 +281,10 @@ int lfs_creat(const char *pathname, int mode){
 
                     }
                 }
-            } // else seek all inodes
+            }else{
+                fprintf(stderr,"\nNo free Inodes\n");
+                return -1;
+            }
         /* Recherche  */
         struct direct * folder = malloc(BSIZE);
         memset(folder,0,BSIZE);
