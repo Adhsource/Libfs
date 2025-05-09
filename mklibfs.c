@@ -69,9 +69,10 @@ int main(int argc, char ** argv){
 
     /* Setting super-block */
 
-    struct filsys super = {nb_blocks,nb_inodes,(nb_inodes-1)};
+    struct filsys super = {nb_blocks,nb_inodes,(nb_inodes)-1};
 
-    /* Definition des inodes libres
+    /*
+     * Definition des inodes libres
      * L'inode 0 etant root, elle n'est pas libre
      */
 

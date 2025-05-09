@@ -230,6 +230,7 @@ int get_file(struct inode * node, int flags){
 
     } else {
         fprintf(stderr,"\nInvalid opening mode\n");
+        abort();
         return -1;
     }
 }
@@ -244,7 +245,7 @@ int lfs_creat(const char *pathname, int mode){
     // si le nom a pas de / alors strrchr retourne Ox1
 
     if(name == (char*)0x1){
-        printf("Failure of strrchr");
+        //printf("Failure of strrchr");
         name = pathname;
     }
     printf("name: %s",name);
@@ -255,9 +256,11 @@ int lfs_creat(const char *pathname, int mode){
             if(super.s_ninode){
                 for(int i = 0; i < NIFREE ; i++){
                     if(super.s_inode[i] != 0){
-                        new = iget(super.s_inode[i]);
-                        super.s_ninode--;
                         new_i_no = super.s_inode[i];
+                        new = iget(new_i_no);
+                        new->i_mode = mode;
+
+                        super.s_ninode--;
                         super.s_inode[i] = 0;
 
                     }
@@ -266,9 +269,6 @@ int lfs_creat(const char *pathname, int mode){
         /* Recherche  */
         struct direct * folder = malloc(BSIZE);
         memset(folder,0,BSIZE);
-
-
-
 
         int i = 0;
         for(; i <NADDR-2; i++){
@@ -287,7 +287,7 @@ int lfs_creat(const char *pathname, int mode){
                 /* Sync sur disque */
                 bwrite(node->i_addr[i],folder);
 
-                return get_file(node,mode);
+                return get_file(new,mode);
             }
         }
         int * indir_dir = malloc(BSIZE);
@@ -318,7 +318,7 @@ int lfs_creat(const char *pathname, int mode){
                     bwrite(indir_dir[k],folder);
                     free(indir_dir);
 
-                    return get_file(node,mode);
+                    return get_file(new,mode);
                 }
             }
         }
@@ -395,17 +395,16 @@ struct inode *namei(const char * name, int flag){
     /* Seraching from root ? */
     if(name[0]=='/'){
         i_out = &inode[0]; // rootdir
-        printf("\n- namei Debug root");
+        //printf("\n- namei Debug root");
     }else{
         i_out = iget(current.u_cdir); //current dir
-        printf("\n- namei Debug curr");
+        //printf("\n- namei Debug curr");
     }
 
     char * path = strtok(new_name,"/");
     while(path){
-        printf("\n%s",path);
-        printf("\n- namei debug: path: %s\n",path);
-        printf("\n- namei debug: mode: %d\n",i_out->i_mode);
+        printf("\n- namei debug: keyword: %s\n",path);
+        printf("\n- namei debug: mode parent: %d\n",i_out->i_mode);
         if((i_out->i_mode)&IFDIR){
             struct direct * dir_names = malloc(BSIZE);
             /* Parcours des blocks directs */
