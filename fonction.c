@@ -46,16 +46,17 @@ void goto_blocks(){
 
 /* Fonctions externes pour lecture/écriture de blocs */
 void bread(int blkno, void *buf){
-
-    fseek(f_file,blkno*BSIZE,SEEK_SET);
-    fread(buf,BSIZE,1 ,f_file);
+    if(buf){
+        fseek(f_file,blkno*BSIZE,SEEK_SET);
+        fread(buf,BSIZE,1 ,f_file);
+    }
 }
 
 void bwrite(int blkno, void *buf){
-
-    fseek(f_file,blkno*BSIZE,SEEK_SET);
-    fwrite(buf,BSIZE,1 ,f_file);
-
+    if(buf){
+        fseek(f_file,blkno*BSIZE,SEEK_SET);
+        fwrite(buf,BSIZE,1 ,f_file);
+    }
 }
 
 /* Fonction retournant le 1er bloc libre */
@@ -379,6 +380,7 @@ struct inode *namei(const char * name, int flag){
 
         if((i_out->i_mode)&IFDIR){
             struct direct * dir_names = malloc(BSIZE);
+            memset(dir_names,0,BSIZE);
             /* Parcours des blocks directs */
             for(int i = 0; i <NADDR-2; i++){
                 i_out_n = NULL;
@@ -425,15 +427,19 @@ struct inode *namei(const char * name, int flag){
 
             if(!i_out_n){
                 int * indir_dir = malloc(BSIZE);
-
+                memset(indir_dir,0,BSIZE);
                 //Verification de la presence du bloc indirect
                 if(i_out->i_addr[NADDR-1]){
                     bread(i_out->i_addr[NADDR-1],indir_dir);
                 }else if(flag == 2){
                     /* Si destruction voulu */
+                    free(dir_names);
+                    free(indir_dir);
                     return NULL;
                 } else if (!flag){
                     /* Si suivant non trouve */
+                    free(dir_names);
+                    free(indir_dir);
                     return i_out;
                 }
 
@@ -476,10 +482,16 @@ struct inode *namei(const char * name, int flag){
                 /* Si rien n'a ete trouve*/
                 /* DEBUG fprintf(stderr,"\nval: %d\n",found); */
                 if(!found){
-                    if (flag == 0)
+                    if (flag == 0){
+                        free(dir_names);
+                        free(indir_dir);
                         return i_out;
-                    if(flag == 2)
+                    }
+                    if(flag == 2){
+                        free(dir_names);
+                        free(indir_dir);
                         return NULL;
+                    }
                     if (flag ==1){
                         /* recherche d'une inode libre*/
 
@@ -492,6 +504,8 @@ struct inode *namei(const char * name, int flag){
                                     int new_i_no = super.s_inode[i];
                                     i_out_n = iget(new_i_no);
                                     if(!i_out_n){
+                                        free(dir_names);
+                                        free(indir_dir);
                                         return NULL;
                                     }
                                     i_out_n->i_mode = 14;
@@ -503,12 +517,16 @@ struct inode *namei(const char * name, int flag){
                             }
                         }else{
                             fprintf(stderr,"\nNo free Inodes\n");
+                            free(dir_names);
+                            free(indir_dir);
                             return NULL;
                         }
 
                         // ajout d'un bloc et des direct
                         /* DEBUG fprintf(stderr,"\nDirect\n"); */
                         if ((i_out_n->i_addr[0] = balloc()) == 0){
+                            free(dir_names);
+                            free(indir_dir);
                             return NULL;
                         }
 
