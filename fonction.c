@@ -46,18 +46,16 @@ void goto_blocks(){
 
 /* Fonctions externes pour lecture/écriture de blocs */
 void bread(int blkno, void *buf){
-    goto_blocks();
-    fseek(f_file,blkno*BSIZE,SEEK_CUR);
+
+    fseek(f_file,blkno*BSIZE,SEEK_SET);
     fread(buf,BSIZE,1 ,f_file);
 }
 
 void bwrite(int blkno, void *buf){
-    goto_blocks();
 
-    fseek(f_file,blkno*BSIZE,SEEK_CUR);
+    fseek(f_file,blkno*BSIZE,SEEK_SET);
     fwrite(buf,BSIZE,1 ,f_file);
-    //fprintf(stderr,"\n\n LD = %ld\n",ftell(f_file));
-    //abort();
+
 }
 
 /* Fonction retournant le 1er bloc libre */
@@ -83,7 +81,7 @@ int balloc(){
 
     }
     fprintf(stderr,"No Free blocks");
-    abort();
+    //abort();
     return -1;
 }
 
@@ -136,6 +134,7 @@ int lfs_mkdir(const char *pathname, int mode) {
 
     /* Écrire le bloc sur disque */
     bwrite(blk, (char *)entries);
+    /* DEBUG fprintf(stderr,"Mode = %d",ip->i_mode);*/
     iput(ip);
     return 0;
 }
@@ -281,6 +280,7 @@ int lfs_creat(const char *pathname, int mode) {
     /* Allouer le premier bloc */
     int blk = bmap(ip, 0, BWRITE);
 
+    /* DEBUG fprintf(stderr,"Mode creat = %d",ip->i_mode);*/
     iput(ip);
     return 0;
 }
@@ -308,7 +308,13 @@ void init_libfs(){
 
     /* Set current dir */
     current.u_cdir=0;
-    iget(0);
+
+    // debug
+    struct inode * d = iget(0);
+
+    /* struct direct* t = malloc(BSIZE);
+    bread(d->i_addr[0],t);
+    fprintf(stderr,"DEBUG INIT addr = %d %s %s",d->i_addr[0],t[0].d_name,t[1].d_name); */
 
 
 }
@@ -357,11 +363,14 @@ struct inode *namei(const char * name, int flag){
         //printf("\n- namei Debug curr");
     }
 
-    char * path = strtok(new_name,"/");
-    while(path){
+    // debug
+    struct direct * tempe = malloc(BSIZE);
 
-        printf("\n- namei debug: keyword: %s\n",path);
-        printf("\n- namei debug: mode parent: %d\n",i_out->i_mode);
+    char * path = strtok(new_name,"/");
+    while(path != 0){
+
+        /* DEBUG printf("\n- namei debug: keyword: %s\n",path);
+        printf("\n- namei debug: mode parent: %d\n",i_out->i_mode); */
 
         found = 0;
         free_dir[0] = 0;
@@ -385,6 +394,10 @@ struct inode *namei(const char * name, int flag){
 
                 /* Pour un bloc entier de struct direct , recherche du nom */
                 for(int j = 0; j < BSIZE/sizeof(struct direct) ; j++){
+
+                    /* DEBUG if(strcmp("",dir_names[j].d_name))
+                        printf("paths : %s %s",path,dir_names[j].d_name);*/
+
                     if(!strcmp(path,dir_names[j].d_name)){
                         i_out_n = iget(dir_names[j].d_ino);
                         found = 1;
@@ -398,11 +411,13 @@ struct inode *namei(const char * name, int flag){
                 /* Si un nouveau nom a bien ete trouve */
                 if (i_out_n != i_out && i_out_n){ // ici
                     i_out = i_out_n;
+                    path = strtok(0,"/");
                     break;
                 }
             }
             /* Parcours des blocs indirects */
 
+            /* DEBUG fprintf(stderr,"\n pointer: %p \n",i_out_n); */
 
             if(!i_out_n){
                 int * indir_dir = malloc(BSIZE);
@@ -413,7 +428,7 @@ struct inode *namei(const char * name, int flag){
                 }else if(flag == 2){
                     /* Si destruction voulu */
                     return NULL;
-                } else {
+                } else if (!flag){
                     /* Si suivant non trouve */
                     return i_out;
                 }
@@ -430,6 +445,10 @@ struct inode *namei(const char * name, int flag){
                     }
 
                     for(int l = 0; l < BSIZE/sizeof(struct direct) ; l++){
+
+                        /* DEBUG if(strcmp("",dir_names[l].d_name) )
+                            printf("paths : %s %s",path,dir_names[l].d_name);*/
+
                         if(!strcmp(path,dir_names[l].d_name)){
                             i_out_n = iget(dir_names[l].d_ino);
                             found = 1;
@@ -443,12 +462,14 @@ struct inode *namei(const char * name, int flag){
                     /* Si un nouveau nom a bien ete trouve */
                     if (i_out_n != i_out && i_out_n){ // ici
                         i_out = i_out_n;
+                        path = strtok(0,"/");
                         break;
                     }
 
 
                 }
                 /* Si rien n'a ete trouve*/
+                /* DEBUG fprintf(stderr,"\nval: %d\n",found); */
                 if(!found){
                     if (flag == 0)
                         return i_out;
@@ -456,6 +477,9 @@ struct inode *namei(const char * name, int flag){
                         return NULL;
                     if (flag ==1){
                         /* recherche d'une inode libre*/
+
+                        /* DEBUG fprintf(stderr,"\n\nINOOOO NB%d",super.s_ninode);*/
+
                         if(super.s_ninode){
                             for(int i = 0; i < NIFREE ; i++){
                                 if(super.s_inode[i] != 0){
@@ -468,6 +492,7 @@ struct inode *namei(const char * name, int flag){
 
                                     super.s_ninode--;
                                     super.s_inode[i] = 0;
+                                    break;
                                 }
                             }
                         }else{
@@ -476,7 +501,7 @@ struct inode *namei(const char * name, int flag){
                         }
 
                         // ajout d'un bloc et des direct
-
+                        /* DEBUG fprintf(stderr,"\nDirect\n"); */
                         if ((i_out_n->i_addr[0] = balloc()) == 0){
                             return NULL;
                         }
@@ -491,32 +516,44 @@ struct inode *namei(const char * name, int flag){
 
                         // modifiaction du parent
                         if(free_dir[0] || free_dir[1]){ // impossible que ce soit les 2 a 0 car correspond a l'entry .
-                            struct direct par = {i_out_n->i_numb,"."};
-                            bread(free_dir[0],dir_names);
-                            dir_names[free_dir[0]] = par;
-                            bwrite(free_dir[0],dir_names);
+
+                            /* DEBUG fprintf(stderr,"\nParent, fd0 : %d, fd1 : %d\n",free_dir[0],free_dir[1]); */
+
+                            struct direct par = {i_out_n->i_numb};
+                            strcpy(par.d_name,path);
+                            bread(i_out->i_addr[free_dir[0]],dir_names);  // ce bread
+                            // test
+
+                            dir_names[free_dir[1]] = par;
+                            bwrite(i_out->i_addr[free_dir[0]],dir_names);
+
 
                         }
 
+                        /* DEBUG
+                        bread(i_out->i_addr[0],dir_names);
+                        printf("\n\nDEBUG Parten:%s",dir_names[free_dir[1]].d_name); */
+
+
+
+                        i_out = i_out_n;
                         free(buff);
                     }
-
-
                 }
-
-
                 free(indir_dir);
             }
-
-        free(dir_names);
+            path = strtok(0,"/");
+            free(dir_names);
 
         } else {
-            fprintf(stderr,"\nnot a folder\n");
+            fprintf(stderr,"\n%s not a folder !\n",path);
+            abort();
             if (flag == 0){
                 return i_out;
             }
             return NULL;
         }
+
     }
 
     /* si suppression demandé et element trouve*/
@@ -602,6 +639,9 @@ struct inode * iget(int ino){
 
 /* Suppression de l'inode en memoire et synchro */
 void iput(struct inode *ip){
+
+    /* DEBUG fprintf(stderr,"\niput no : %d, %d\n",ip->i_numb,ip->i_mode);*/
+
 
     goto_inodes();
     fseek(f_file,32*ip->i_numb,SEEK_CUR); //seek to correct inode
