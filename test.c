@@ -6,29 +6,29 @@ int main(){
 
     int ret;
 
-    printf("\n--- current dir : %d\n\n\n",current.u_cdir);
+    fprintf(stderr,"\n--- current dir : %d\n\n\n",current.u_cdir);
 
-    printf("\n--- inode iget()\n");
+    fprintf(stderr,"\n--- inode iget()\n");
     struct inode * rt = iget(2);
-    printf("\n--- inode: mode: %d , num: %d \n\n\n",rt->i_mode,rt->i_numb);
+    fprintf(stderr,"\n--- inode: mode: %d , num: %d \n\n\n",rt->i_mode,rt->i_numb);
 
-    printf("\n--- mkdir()\n");
+    fprintf(stderr,"\n--- mkdir()\n");
     ret = lfs_mkdir("/bin",IFDIR);
-    printf("\n--- mkdir() : %d\n\n\n",ret);
+    fprintf(stderr,"\n--- mkdir() : %d\n\n\n",ret);
 
 
     // iput(rt);
-    printf("\n--- iput: mode: %d , num: %d \n",rt->i_mode,rt->i_numb);
-    printf("\n--- creat()\n");
+    fprintf(stderr,"\n--- iput: mode: %d , num: %d \n",rt->i_mode,rt->i_numb);
+    fprintf(stderr,"\n--- creat()\n");
     ret = lfs_creat("test",IFNORM|IREAD|IWRITE);  //debug
-    printf("\n--- creat() : %d\n\n\n",ret);
+    fprintf(stderr,"\n--- creat() : %d\n\n\n",ret);
 
 
     //struct inode * in = namei(".",0);
     //printf("namei : %d\n",in->i_numb);
 
     //lfs_chdir("/bin");
-    printf("--- current dir : %d\n\n\n",current.u_cdir);
+    fprintf(stderr,"--- current dir : %d\n\n\n",current.u_cdir);
 
     close_libfs(); // casse tout
 

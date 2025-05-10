@@ -81,7 +81,6 @@ int balloc(){
 
     }
     fprintf(stderr,"No Free blocks");
-    //abort();
     return -1;
 }
 
@@ -134,7 +133,7 @@ int lfs_mkdir(const char *pathname, int mode) {
 
     /* Écrire le bloc sur disque */
     bwrite(blk, (char *)entries);
-    /* DEBUG fprintf(stderr,"Mode = %d",ip->i_mode);*/
+    /* Debug fprintf(stderr,"Number= %d",ip->i_numb);*/
     iput(ip);
     return 0;
 }
@@ -272,7 +271,6 @@ int lfs_open(const char *pathname,int flags ){
 int lfs_creat(const char *pathname, int mode) {
     struct inode *ip = namei((char *)pathname, 1);
     if (!ip) return -1;
-
     /* Définir le mode et la taille du répertoire (un bloc) */
     ip->i_mode = IFNORM | mode;
     ip->i_size = BSIZE;
@@ -280,7 +278,7 @@ int lfs_creat(const char *pathname, int mode) {
     /* Allouer le premier bloc */
     int blk = bmap(ip, 0, BWRITE);
 
-    /* DEBUG fprintf(stderr,"Mode creat = %d",ip->i_mode);*/
+    /* Debug fprintf(stderr,"Number= %d",ip->i_numb);*/
     iput(ip);
     return 0;
 }
@@ -347,6 +345,8 @@ struct inode *namei(const char * name, int flag){
     struct inode * i_out = NULL;
     struct inode * i_out_n = NULL;
 
+
+
     int free_addr = -1;
     int free_dir[2] = {0,0};
     int found = 0;
@@ -364,6 +364,7 @@ struct inode *namei(const char * name, int flag){
     }
 
     // debug
+
     struct direct * tempe = malloc(BSIZE);
 
     char * path = strtok(new_name,"/");
@@ -396,7 +397,8 @@ struct inode *namei(const char * name, int flag){
                 for(int j = 0; j < BSIZE/sizeof(struct direct) ; j++){
 
                     /* DEBUG if(strcmp("",dir_names[j].d_name))
-                        printf("paths : %s %s",path,dir_names[j].d_name);*/
+                        printf("paths : %s %s  |",path,dir_names[j].d_name);
+                    */
 
                     if(!strcmp(path,dir_names[j].d_name)){
                         i_out_n = iget(dir_names[j].d_ino);
@@ -417,7 +419,9 @@ struct inode *namei(const char * name, int flag){
             }
             /* Parcours des blocs indirects */
 
-            /* DEBUG fprintf(stderr,"\n pointer: %p \n",i_out_n); */
+            /* DEBUG fprintf(stderr,"\n pointer: %p \n",i_out_n);*/
+
+
 
             if(!i_out_n){
                 int * indir_dir = malloc(BSIZE);
@@ -468,6 +472,7 @@ struct inode *namei(const char * name, int flag){
 
 
                 }
+
                 /* Si rien n'a ete trouve*/
                 /* DEBUG fprintf(stderr,"\nval: %d\n",found); */
                 if(!found){
@@ -481,6 +486,7 @@ struct inode *namei(const char * name, int flag){
                         /* DEBUG fprintf(stderr,"\n\nINOOOO NB%d",super.s_ninode);*/
 
                         if(super.s_ninode){
+                            /* Debug fprintf(stderr,"\nALLOC INODE Inodes\n");*/
                             for(int i = 0; i < NIFREE ; i++){
                                 if(super.s_inode[i] != 0){
                                     int new_i_no = super.s_inode[i];
@@ -517,7 +523,7 @@ struct inode *namei(const char * name, int flag){
                         // modifiaction du parent
                         if(free_dir[0] || free_dir[1]){ // impossible que ce soit les 2 a 0 car correspond a l'entry .
 
-                            /* DEBUG fprintf(stderr,"\nParent, fd0 : %d, fd1 : %d\n",free_dir[0],free_dir[1]); */
+                            /* DEBUG fprintf(stderr,"\nParent, fd0 : %d, fd1 : %d\n",free_dir[0],free_dir[1]);*/
 
                             struct direct par = {i_out_n->i_numb};
                             strcpy(par.d_name,path);
@@ -531,8 +537,10 @@ struct inode *namei(const char * name, int flag){
                         }
 
                         /* DEBUG
+                        memset(dir_names, 0, BSIZE);
                         bread(i_out->i_addr[0],dir_names);
-                        printf("\n\nDEBUG Parten:%s",dir_names[free_dir[1]].d_name); */
+                        printf("\n\nDEBUG Parten:%s, %d",dir_names[free_dir[1]].d_name,dir_names[free_dir[1]].d_ino);
+                        */
 
 
 
@@ -547,7 +555,6 @@ struct inode *namei(const char * name, int flag){
 
         } else {
             fprintf(stderr,"\n%s not a folder !\n",path);
-            abort();
             if (flag == 0){
                 return i_out;
             }
@@ -625,7 +632,7 @@ struct inode * iget(int ino){
 
     struct dinode temp;
     fread(&temp,sizeof(temp),1 ,f_file);
-    // printf("\niget debug: inode: %d mode: %d , size: %d, zone = %d \n",ino,temp.di_mode,temp.di_size,free_slot);
+    /* DEBUG printf("\n iget debug: inode: %d mode: %d , size: %d, zone = %d \n",ino,temp.di_mode,temp.di_size,free_slot); */
 
     // modification of the free_slot in memory
     memcpy(&inode[free_slot].i_addr,&temp.di_addr,sizeof(unsigned int) * 6 );
