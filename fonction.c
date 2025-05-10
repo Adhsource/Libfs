@@ -589,7 +589,6 @@ struct inode *namei(const char * name, int flag){
     free(new_name);
     /* si suppression demandé et element trouve*/
     if(flag == 2 && found){
-        i_out->i_numb = 0;
         for(int u = 0; u < NADDR-2;u++){
             bfree(i_out->i_addr[u]);
         }
@@ -604,7 +603,20 @@ struct inode *namei(const char * name, int flag){
                 bfree(indir[v]);
 
         }
+        if(super.s_ninode < NIFREE){
+            for(int i = 0; i < NIFREE ; i++){
+                if(super.s_inode[i] == 0){
+                    super.s_ninode++;
+                    super.s_inode[i] = i_out->i_numb ;
+                    break;
+                }
+            }
+        }
+
+        i_out->i_numb = 0;
         i_out->i_mode = 0;
+
+
     }
     return i_out;
 }

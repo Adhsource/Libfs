@@ -17,7 +17,7 @@ clear:
 	clear
 
 file:	mklibfs
-	./mklibfs -s 200 -i 14
+	./mklibfs -s 200 -i 32
 
 quick: clear core test
 	./test

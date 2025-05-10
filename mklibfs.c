@@ -69,14 +69,19 @@ int main(int argc, char ** argv){
 
     /* Setting super-block */
 
-    struct filsys super = {nb_blocks,nb_inodes,(nb_inodes)-1};
+    struct filsys super = {nb_blocks,nb_inodes};
+    if(nb_inodes <= NIFREE){
+        super.s_ninode = nb_inodes - 1;
+    } else {
+        super.s_ninode = NIFREE;
+    }
 
     /*
      * Definition des inodes libres
      * L'inode 0 etant root, elle n'est pas libre
      */
 
-    for(int i = 1; i<= NIFREE && i < nb_inodes; i++)
+    for(int i = 1; i <= NIFREE && i < nb_inodes; i++)
         super.s_inode[i-1] = i;
 
     fwrite(&super,BSIZE,1,f_file);
