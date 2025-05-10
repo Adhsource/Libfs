@@ -366,8 +366,6 @@ struct inode *namei(const char * name, int flag){
 
     // debug
 
-    struct direct * tempe = malloc(BSIZE);
-
     char * path = strtok(new_name,"/");
     while(path != 0){
 
@@ -435,11 +433,13 @@ struct inode *namei(const char * name, int flag){
                     /* Si destruction voulu */
                     free(dir_names);
                     free(indir_dir);
+                    free(new_name);
                     return NULL;
                 } else if (!flag){
                     /* Si suivant non trouve */
                     free(dir_names);
                     free(indir_dir);
+                    free(new_name);
                     return i_out;
                 }
 
@@ -490,6 +490,7 @@ struct inode *namei(const char * name, int flag){
                     if(flag == 2){
                         free(dir_names);
                         free(indir_dir);
+                        free(new_name);
                         return NULL;
                     }
                     if (flag ==1){
@@ -506,6 +507,7 @@ struct inode *namei(const char * name, int flag){
                                     if(!i_out_n){
                                         free(dir_names);
                                         free(indir_dir);
+                                        free(new_name);
                                         return NULL;
                                     }
                                     i_out_n->i_mode = 14;
@@ -519,6 +521,7 @@ struct inode *namei(const char * name, int flag){
                             fprintf(stderr,"\nNo free Inodes\n");
                             free(dir_names);
                             free(indir_dir);
+                            free(new_name);
                             return NULL;
                         }
 
@@ -527,6 +530,7 @@ struct inode *namei(const char * name, int flag){
                         if ((i_out_n->i_addr[0] = balloc()) == 0){
                             free(dir_names);
                             free(indir_dir);
+                            free(new_name);
                             return NULL;
                         }
 
@@ -574,13 +578,15 @@ struct inode *namei(const char * name, int flag){
         } else {
             fprintf(stderr,"\n%s not a folder !\n",path);
             if (flag == 0){
+                free(new_name);
                 return i_out;
             }
+            free(new_name);
             return NULL;
         }
 
     }
-
+    free(new_name);
     /* si suppression demandé et element trouve*/
     if(flag == 2 && found){
         i_out->i_numb = 0;
