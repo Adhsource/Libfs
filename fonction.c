@@ -329,13 +329,13 @@ void close_libfs(){
 // Verifier le else
 // free des inodes ??
 // flag 0 existe deja ,1 cree ,2 delete
-// ouais delet !
 
 // mon prie enamei
 struct inode *namei(const char * name, int flag){
     struct inode * i_out = NULL;
     struct inode * i_out_n = NULL;
 
+    int free_addr = -1;
 
     /* copy of the name (because strtok) */
     char * new_name = strdup(name);
@@ -362,9 +362,12 @@ struct inode *namei(const char * name, int flag){
                 /* Si adresse lecture, sinon passage suivant */
                 if(i_out->i_addr[i])
                     bread(i_out->i_addr[i],dir_names);
-                else
+                else if (free_addr < 0){
+                    free_addr = i; // pour la gestion de la création
                     continue;
-
+                } else {
+                    continue;
+                }
 
                 /* Pour un bloc entier de struct direct , recherche du nom */
                 for(int j = 0; j < BSIZE/sizeof(struct direct) ; j++){
@@ -379,7 +382,7 @@ struct inode *namei(const char * name, int flag){
                     break;
                 }
             }
-            /* Parcours des blocs indirects */  // cassé
+            /* Parcours des blocs indirects */
 
 
             if(!i_out_n){
@@ -389,16 +392,38 @@ struct inode *namei(const char * name, int flag){
 
                 if(i_out->i_addr[NADDR-1]){
                     bread(i_out->i_addr[NADDR-1],dir_names);
+                } else if(flag == 1 && free_addr){
+                    if(super.s_ninode){
+                        for(int i = 0; i < NIFREE ; i++){
+                            if(super.s_inode[i] != 0){
+                                int new_i_no = super.s_inode[i];
+                                i_out_n = iget(new_i_no);
+                                i_out_n->i_mode = 14;
+
+                                super.s_ninode--;
+                                super.s_inode[i] = 0;
+
+                            }
+                        }
+                    }else{
+                        fprintf(stderr,"\nNo free Inodes\n");
+                        return i_out;
+                    }
+                    continue;
                 } else {
-                    break;
+                    return i_out;
                 }
 
                 // lecture des adresses des blocs indirects
                 for(int k = 0; k < BSIZE/sizeof(int); k++){
-                    if(indir_dir[k])
+                    if(indir_dir[k]){
                         bread(indir_dir[k],dir_names);
-                    else
+                    } else if (free_addr < 0){
+                        free_addr = k; // pour la gestion de la création
                         continue;
+                    } else {
+                        continue;
+                    }
 
                     for(int j = 0; j < BSIZE/sizeof(struct direct) ; j++){
                         if(!strcmp(path,dir_names[j].d_name)){
@@ -407,9 +432,29 @@ struct inode *namei(const char * name, int flag){
                         }
                     }
 
-                    if (i_out_n != i_out){
+                    if (i_out_n != i_out && i_out_n){
                         i_out = i_out_n;
                         break;
+                    } else if(flag == 1 && free_addr){
+                        if(super.s_ninode){
+                            for(int i = 0; i < NIFREE ; i++){
+                                if(super.s_inode[i] != 0){
+                                    int new_i_no = super.s_inode[i];
+                                    i_out_n = iget(new_i_no);
+                                    i_out_n->i_mode = 14;
+
+                                    super.s_ninode--;
+                                    super.s_inode[i] = 0;
+
+                                }
+                            }
+                        }else{
+                            fprintf(stderr,"\nNo free Inodes\n");
+                            return i_out;
+                        }
+                        continue;
+                    } else {
+                        return i_out;
                     }
                 }
                 free(indir_dir);
@@ -417,9 +462,9 @@ struct inode *namei(const char * name, int flag){
 
         free(dir_names);
 
-        }else{ // if name not found
+        }else{ // if name not found  // verif
             fprintf(stderr,"\nName not found\n");
-            flag =1; // pour eviter les supperssion du mauvais fichier
+            flag =0; // pour eviter les supperssion du mauvais fichier
             break;
         }
 
