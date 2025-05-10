@@ -323,6 +323,11 @@ void close_libfs(){
     fseek(f_file,BSIZE,SEEK_SET);
     fwrite(&super,BSIZE,1 ,f_file);
 
+    for(int i = 0; i < NFILE; i++){
+        if(current.u_ofile[i])
+            free(current.u_ofile[i]);
+    }
+
     fclose(f_file);
 }
 
