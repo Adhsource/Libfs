@@ -43,7 +43,7 @@ int main(){
     //lfs_chdir("/bin");
     fprintf(stderr,"--- current dir : %d\n\n\n",current.u_cdir);
 
-    close_libfs(); // casse tout
+    close_libfs();
 
     return 0;
 }

@@ -165,6 +165,11 @@ int lfs_read(int fd, void *buf, int count) {
         int bn = offset / BSIZE;
         int boff = offset % BSIZE;
         int blk = bmap(ip, bn, BREAD);
+        if(blk == -1){
+            printf("Error in reading");
+            return -1;
+        }
+
         bread(blk, block);
 
         int to_copy = BSIZE - boff;
@@ -195,6 +200,10 @@ int lfs_write(int fd, void *buf, int count) {
         int bn = offset / BSIZE;
         int boff = offset % BSIZE;
         int blk = bmap(ip, bn, BWRITE);
+        if(blk == -1){
+            printf("Error in writing");
+            return -1;
+        }
 
         /* Lire l'ancien contenu si partiellement remplissage */
         if (boff) bread(blk, block);
@@ -598,7 +607,7 @@ struct inode *namei(const char * name, int flag){
     free(new_name);
     /* si suppression demandé et element trouve*/
     if(flag == 2 && found){
-        fprintf(stderr,"\nunlinkkkkk no : %d, %d\n",i_out->i_numb,i_out->i_mode);
+        /* Debug fprintf(stderr,"\nunlinkkkkk no : %d, %d\n",i_out->i_numb,i_out->i_mode); */
         for(int u = 0; u < NADDR-2;u++){
             bfree(i_out->i_addr[u]);
         }
@@ -691,7 +700,7 @@ struct inode * iget(int ino){
 /* Suppression de l'inode en memoire et synchro */
 void iput(struct inode *ip){
 
-    fprintf(stderr,"\niput no : %d, %d\n",ip->i_numb,ip->i_mode);
+    /* Debug fprintf(stderr,"\niput no : %d, %d\n",ip->i_numb,ip->i_mode); */
     //if(ip->i_numb == 0) abort();
 
     goto_inodes();
@@ -723,24 +732,29 @@ int bmap(struct inode *ip, int bn, int flag){
     /* If no indirections */
     if(bn < NADDR-1){
         int realbn = ip->i_addr[bn];
-        if(!realbn){
+        if(!realbn && flag == BWRITE){
             int newblk = balloc();
             if(newblk > 0){
                 ip->i_addr[bn] = newblk;
                 return newblk;
+            } else {
+                return -1;
             }
-            return realbn;
+        } else if(realbn){
+           return realbn;
         }
 
     /* If indirect block not set*/
     } else {
         int realbn = ip->i_addr[NADDR-1];
 
-        if(!realbn){
+        if(!realbn && flag == BWRITE){
             int newblk = balloc();
             if(newblk > 0){
                 ip->i_addr[NADDR-1] = newblk;
             }
+        } else if(!realbn && flag == BREAD){
+            return -1;
         }
 
         /* Reading indirect block */
@@ -749,11 +763,17 @@ int bmap(struct inode *ip, int bn, int flag){
 
         int indir_bn = bn - NADDR + 1;
         realbn = ind_blk[indir_bn];
-        if(!realbn){
+        if(!realbn && flag == BWRITE){
             realbn = balloc();
             if(realbn > 0){
                 ind_blk[indir_bn] = realbn;
+            } else {
+                free(ind_blk);
+                return -1;
             }
+        } else if(realbn){
+            free(ind_blk);
+            return realbn;
         }
         free(ind_blk);
         return realbn;
