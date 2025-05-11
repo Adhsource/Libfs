@@ -72,7 +72,7 @@ int balloc(){
 
         for(int j = 0; j < 8; j++){
             val = (1<<j);
-            printf("temp: %d, val %d\n",temp, val);
+            /* Debug printf("temp: %d, val %d\n",temp, val);*/
             if(!(temp&val)){
                 temp |= val;
                 fseek(f_file,-1,SEEK_CUR);
@@ -99,7 +99,7 @@ void bfree(int blkno){
 
 
     fread(&bits,1,1,f_file);
-    goto_bitmap_block(blkno);
+    fseek(f_file,-1,SEEK_CUR);
 
     bits = bits & ~mask;
 
@@ -651,7 +651,7 @@ struct inode * iget(int ino){
         if(free_slot == -1 && inode[i].i_mode == 0)
             free_slot=i;
     }
-
+    /* Mise en memoire de l'inode*/
     if(free_slot == -1){
         fprintf(stderr,"\nNo free inode slot\n");
         return NULL;
