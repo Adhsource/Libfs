@@ -47,6 +47,7 @@ void goto_blocks(){
 /* Fonctions externes pour lecture/écriture de blocs */
 void bread(int blkno, void *buf){
     if(buf){
+        memset(buf,0,BSIZE);
         fseek(f_file,blkno*BSIZE,SEEK_SET);
         fread(buf,BSIZE,1 ,f_file);
     }
@@ -117,6 +118,7 @@ int lfs_mkdir(const char *pathname, int mode) {
     /* Allouer et initialiser le premier bloc */
     int blk = bmap(ip, 0, BWRITE);
     struct direct entries[BSIZE / sizeof(struct direct)];
+    memset(&entries,0,BSIZE);
     int ino_new = ip - inode;    /* numéro d'inode du nouveau répertoire */
     int ino_parent = current.u_cdir;  /* inode du répertoire courant */
 
@@ -186,6 +188,7 @@ int lfs_write(int fd, void *buf, int count) {
     int total = 0;
     int offset = ip->i_size;
     char block[BSIZE];
+    memset(&block,0,BSIZE);
 
     while (total < count) {
         int bn = offset / BSIZE;
@@ -549,6 +552,7 @@ struct inode *namei(const char * name, int flag){
 
                             struct direct par = {i_out_n->i_numb};
                             strcpy(par.d_name,path);
+
                             bread(i_out->i_addr[free_dir[0]],dir_names);  // ce bread
                             // test
 
@@ -596,7 +600,6 @@ struct inode *namei(const char * name, int flag){
         if(i_out->i_addr[NADDR-1]){
 
             int * indir = malloc(BSIZE);
-            memset(indir,0,BSIZE);
             bread(i_out->i_addr[NADDR-1],indir);
 
             for(int v = 0; v < BSIZE/sizeof(int); v++)
