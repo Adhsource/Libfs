@@ -245,6 +245,7 @@ int lfs_chdir(const char * path){
 }
 /* Parcours la table des fichiers pour un emplacement */
 int get_file(struct inode * node, int flags){
+
     if(node->i_mode&flags){
         for(int i = 0; i < NFILE; i++){
             if(current.u_ofile[i] == NULL){
@@ -549,7 +550,7 @@ struct inode *namei(const char * name, int flag){
 
                         bwrite(i_out_n->i_addr[0],buff);
 
-                        // modifiaction du parent
+                        // modification du parent
                         if(free_dir[0] || free_dir[1]){ // impossible que ce soit les 2 a 0 car correspond a l'entry .
 
                             /* DEBUG fprintf(stderr,"\nParent, fd0 : %d, fd1 : %d\n",free_dir[0],free_dir[1]);*/
@@ -597,6 +598,7 @@ struct inode *namei(const char * name, int flag){
     free(new_name);
     /* si suppression demandé et element trouve*/
     if(flag == 2 && found){
+        fprintf(stderr,"\nunlinkkkkk no : %d, %d\n",i_out->i_numb,i_out->i_mode);
         for(int u = 0; u < NADDR-2;u++){
             bfree(i_out->i_addr[u]);
         }
@@ -620,7 +622,6 @@ struct inode *namei(const char * name, int flag){
             }
         }
 
-        i_out->i_numb = 0;
         i_out->i_mode = 0;
 
 
@@ -691,7 +692,7 @@ struct inode * iget(int ino){
 void iput(struct inode *ip){
 
     fprintf(stderr,"\niput no : %d, %d\n",ip->i_numb,ip->i_mode);
-
+    //if(ip->i_numb == 0) abort();
 
     goto_inodes();
     fseek(f_file,32*ip->i_numb,SEEK_CUR); //seek to correct inode
@@ -711,7 +712,7 @@ void iput(struct inode *ip){
 
     // Libération de l'inode mémoire
     ip->i_mode = 0;
-    ip->i_numb = 0;
+    ip->i_numb = 0;  // pour eviter les conflits avec namei
 }
 
 
