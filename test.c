@@ -8,9 +8,9 @@ int main(){
 
     fprintf(stderr,"\n--- current dir : %d\n\n\n",current.u_cdir);
 
-    fprintf(stderr,"\n--- inode iget()\n");
+    /*fprintf(stderr,"\n--- inode iget()\n");
     struct inode * rt = iget(2);
-    fprintf(stderr,"\n--- inode: mode: %d , num: %d \n\n\n",rt->i_mode,rt->i_numb);
+    fprintf(stderr,"\n--- inode: mode: %d , num: %d \n\n\n",rt->i_mode,rt->i_numb);*/
 
     fprintf(stderr,"\n--- mkdir()\n");
     ret = lfs_mkdir("/bin",IFDIR);
@@ -18,14 +18,14 @@ int main(){
 
 
     // iput(rt);
-    fprintf(stderr,"\n--- iput: mode: %d , num: %d \n",rt->i_mode,rt->i_numb);
+    //fprintf(stderr,"\n--- iput: mode: %d , num: %d \n",rt->i_mode,rt->i_numb);
     fprintf(stderr,"\n--- creat()\n");
     ret = lfs_creat("test",IFNORM|IREAD|IWRITE);  //debug
     fprintf(stderr,"\n--- creat() : %d\n\n\n",ret);
 
     fprintf(stderr,"\n--- open()\n");
-    //int fd = lfs_creat("test",IREAD|IWRITE);
-    //fprintf(stderr,"\n--- open() fd: %d\n\n\n",fd);
+    int fd = lfs_creat("test",IREAD|IWRITE);
+    fprintf(stderr,"\n--- open() fd: %d\n\n\n",fd);
 
 
 

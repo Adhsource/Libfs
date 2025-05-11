@@ -138,7 +138,7 @@ int lfs_mkdir(const char *pathname, int mode) {
     /* Écrire le bloc sur disque */
     bwrite(blk, (char *)entries);
     /* Debug fprintf(stderr,"Number= %d",ip->i_numb);*/
-    iput(ip);
+    //iput(ip);
     return 0;
 }
 
@@ -299,7 +299,7 @@ int lfs_creat(const char *pathname, int mode) {
 
     /* Debug fprintf(stderr,"\nmode @ creat= %d, %d",ip->i_mode,ip->i_numb);*/
 
-    iput(ip);
+    //iput(ip);
     return 0;
 }
 
@@ -666,39 +666,27 @@ struct inode * iget(int ino){
         fprintf(stderr,"\nNo free inode slot\n");
         return NULL;
     } else {
+        /* recuperation de l'inode disque */
         goto_inodes();
-        fseek(f_file,(sizeof(struct dinode)*ino),SEEK_CUR);
+        fseek(f_file,(sizeof(struct dinode)*ino),SEEK_CUR); //seek to correct inode
         fread(&tmp,sizeof(struct dinode),1,f_file);
 
-
+        /* copie */
         inode[free_slot].i_mode = tmp.di_mode;
         inode[free_slot].i_size = tmp.di_size;
         inode[free_slot].i_numb = ino;
-        memcpy(&inode[free_slot],tmp.di_addr,sizeof(int)*6 );
+        memcpy(&inode[free_slot].i_addr,tmp.di_addr,sizeof(unsigned int)*6 );
 
     }
 
-
-    /* recuperation de l'inode disque */
-    goto_inodes();
-    fseek(f_file,32*ino,SEEK_CUR); //seek to correct inode
-
-    struct dinode temp;
-    fread(&temp,sizeof(temp),1 ,f_file);
-    /* DEBUG printf("\n iget debug: inode: %d mode: %d , size: %d, zone = %d \n",ino,temp.di_mode,temp.di_size,free_slot); */
-
-    // modification of the free_slot in memory
-    memcpy(&inode[free_slot].i_addr,&temp.di_addr,sizeof(unsigned int) * 6 );
-
-    inode[free_slot].i_mode = temp.di_mode;
-    inode[free_slot].i_size= temp.di_size;
-    inode[free_slot].i_numb = ino;
+    /* Debug printf("\n iget debug: inode: %d mode: %d , size: %d, zone = %d \n",ino,tmp.di_mode,tmp.di_size,free_slot); */
 
     return &inode[free_slot];
 }
 
 /* Suppression de l'inode en memoire et synchro */
 void iput(struct inode *ip){
+
 
     /* Debug fprintf(stderr,"\niput no : %d, %d\n",ip->i_numb,ip->i_mode); */
     //if(ip->i_numb == 0) abort();
