@@ -337,10 +337,8 @@ void close_libfs(){
 }
 
 /* Fonction de recherche d'inode par nom */
-// Verifier le else
-// free des inodes ??
-// flag 0 existe deja ,1 cree ,2 delete
 
+// flag 0 existe deja ,1 cree ,2 delete
 // mon prie enamei
 struct inode *namei(const char * name, int flag){
     struct inode * i_out = NULL;
