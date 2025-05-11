@@ -24,6 +24,8 @@ int main(){
     fprintf(stderr,"\n--- creat() : %d\n\n\n",ret);
 
     lfs_chdir("test");
+    //fprintf(stderr,"\n--- unlink()\n");
+    //lfs_unlink("test");
 
     //struct inode * in = namei(".",0);
     //printf("namei : %d\n",in->i_numb);

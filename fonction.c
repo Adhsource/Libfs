@@ -69,12 +69,13 @@ int balloc(){
     // parcours de la bitmap
     for(int i = 0; i < ((super.s_fsize+7)/8); i++){
         fread(&temp,1,1,f_file);
-        fseek(f_file,-1,SEEK_CUR);
 
         for(int j = 0; j < 8; j++){
             val = (1<<j);
+            printf("temp: %d, val %d\n",temp, val);
             if(!(temp&val)){
                 temp |= val;
+                fseek(f_file,-1,SEEK_CUR);
                 fwrite(&temp,1,1,f_file);
                 return ((i*8)+j);
 
@@ -689,7 +690,7 @@ struct inode * iget(int ino){
 /* Suppression de l'inode en memoire et synchro */
 void iput(struct inode *ip){
 
-    /* DEBUG fprintf(stderr,"\niput no : %d, %d\n",ip->i_numb,ip->i_mode);*/
+    fprintf(stderr,"\niput no : %d, %d\n",ip->i_numb,ip->i_mode);
 
 
     goto_inodes();
