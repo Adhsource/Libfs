@@ -229,9 +229,13 @@ int lfs_close(int fd) {
 // inode en memoire ??
 int lfs_chdir(const char * path){
     struct inode * node = namei(path,0);
+
+    /* Debug fprintf(stderr,"\nmode @ chdir= %d, %d",node->i_mode,node->i_numb); */
+
     if(!node){
         return -1; //fd
     }else if(node->i_mode & IFNORM){
+        fprintf(stderr,"\nNot a directory\n");
         return -1;
     }else{
         current.u_cdir = node->i_numb;
@@ -282,7 +286,8 @@ int lfs_creat(const char *pathname, int mode) {
     /* Allouer le premier bloc */
     int blk = bmap(ip, 0, BWRITE);
 
-    /* Debug fprintf(stderr,"Number= %d",ip->i_numb);*/
+    /* Debug fprintf(stderr,"\nmode @ creat= %d, %d",ip->i_mode,ip->i_numb);*/
+
     iput(ip);
     return 0;
 }
@@ -578,7 +583,7 @@ struct inode *namei(const char * name, int flag){
             free(dir_names);
 
         } else {
-            fprintf(stderr,"\n%s not a folder !\n",path);
+            fprintf(stderr,"\n%s Not a directory !\n",path);
             if (flag == 0){
                 free(new_name);
                 return i_out;
@@ -698,11 +703,14 @@ void iput(struct inode *ip){
     temp.di_mode = ip->i_mode;
     temp.di_size = ip->i_size;
 
+    /* Debug fprintf(stderr,"\nmode @ iput= %d, %d",ip->i_mode,ip->i_numb);*/
+
     // Ecriture sur disque
     fwrite(&temp,sizeof(temp),1 ,f_file);
 
     // Libération de l'inode mémoire
     ip->i_mode = 0;
+    ip->i_numb = 0;
 }
 
 

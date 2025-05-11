@@ -23,6 +23,7 @@ int main(){
     ret = lfs_creat("test",IFNORM|IREAD|IWRITE);  //debug
     fprintf(stderr,"\n--- creat() : %d\n\n\n",ret);
 
+    lfs_chdir("test");
 
     //struct inode * in = namei(".",0);
     //printf("namei : %d\n",in->i_numb);
